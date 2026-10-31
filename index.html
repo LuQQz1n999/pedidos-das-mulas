@@ -14,7 +14,24 @@
 </style></head>
 <body><main class="wrap">
 <header class="top"><div class="brand"><div class="logo">🫏</div><div><div class="eyebrow">A temporada das promessas</div><h1>Pedidos das Mulas</h1></div></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button id="loginToggle" type="button" style="border:1px solid var(--line);background:#292018;color:var(--text);border-radius:999px;padding:10px 14px;font-weight:700;cursor:pointer">Área administrativa</button><div class="season">TEMPORADA <b>01</b> · EM ANDAMENTO</div></div></header>
-<section id="adminBox" hidden style="background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:18px"><h3 style="margin:0 0 10px">Acesso administrativo</h3><form id="loginForm" style="display:grid;gap:10px;max-width:420px"><label for="adminEmail">E-mail</label><input id="adminEmail" type="email" autocomplete="username" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><label for="adminPassword">Senha</label><input id="adminPassword" type="password" autocomplete="current-password" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><button type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Entrar</button></form><div id="adminMessage" role="status" style="margin-top:10px;color:var(--muted)"></div><button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
+<section id="adminBox" hidden style="background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:18px"><h3 style="margin:0 0 10px">Acesso administrativo</h3><form id="loginForm" style="display:grid;gap:10px;max-width:420px"><label for="adminEmail">E-mail</label><input id="adminEmail" type="email" autocomplete="username" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><label for="adminPassword">Senha</label><input id="adminPassword" type="password" autocomplete="current-password" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><button type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Entrar</button></form><div id="adminMessage" role="status" style="margin-top:10px;color:var(--muted)"></div>
+<div id="balanceTools" hidden style="margin-top:16px;padding-top:15px;border-top:1px solid var(--line);max-width:460px">
+<h4 style="margin:0 0 10px">Ajustar saldo de pedidos</h4>
+<form id="balanceForm" style="display:grid;gap:9px">
+<label for="balanceParticipant">Participante</label>
+<select id="balanceParticipant" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"></select>
+<label for="balanceAction">Ação</label>
+<select id="balanceAction" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<option value="add">Adicionar pedidos</option><option value="remove">Remover pedidos</option>
+</select>
+<label for="balanceAmount">Quantidade</label>
+<input id="balanceAmount" type="number" min="1" step="1" required placeholder="Ex.: 1" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<label for="balanceReason">Motivo da alteração</label>
+<input id="balanceReason" type="text" maxlength="300" required placeholder="Ex.: correção após validação" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<button id="balanceSubmit" type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Salvar ajuste</button>
+</form><div id="balanceMessage" role="status" style="margin-top:10px;color:var(--muted)"></div>
+</div>
+<button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
 <article class="person" data-slug="apokao"><div class="photo"><img src="apokao.png" alt="Apokão"></div><div class="name-row"><div class="name">APOKÃO</div><div class="count zero">0</div></div><span class="status empty">Sem pedidos</span></article>
@@ -39,15 +56,27 @@ const loginToggle = document.getElementById("loginToggle");
 const loginForm = document.getElementById("loginForm");
 const adminMessage = document.getElementById("adminMessage");
 const logoutButton = document.getElementById("logoutButton");
+const balanceTools = document.getElementById("balanceTools");
+const balanceForm = document.getElementById("balanceForm");
+const balanceParticipant = document.getElementById("balanceParticipant");
+const balanceMessage = document.getElementById("balanceMessage");
 
 async function loadParticipants() {
   try {
     const { data, error } = await supabase
       .from("participants")
-      .select("slug,name,balance");
+      .select("id,slug,name,balance");
     if (error) throw error;
 
     let totalRequests = 0;
+    const selectedId = balanceParticipant.value;
+    balanceParticipant.replaceChildren(...data.map((participant) => {
+      const option = document.createElement("option");
+      option.value = participant.id;
+      option.textContent = participant.name;
+      return option;
+    }));
+    if (data.some((participant) => participant.id === selectedId)) balanceParticipant.value = selectedId;
     data.forEach((participant) => {
       const card = document.querySelector('[data-slug="' + participant.slug + '"]');
       if (!card) return;
@@ -81,6 +110,7 @@ async function refreshAdminState() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     adminMessage.textContent = "Entre com a conta cadastrada como administradora.";
+    balanceTools.hidden = true;
     loginForm.hidden = false;
     logoutButton.hidden = true;
     return;
@@ -97,16 +127,48 @@ async function refreshAdminState() {
     return;
   }
   if (data) {
-    adminMessage.textContent = "Acesso administrativo confirmado para " + user.email + ". O painel de alterações ainda será habilitado em uma próxima etapa.";
+    adminMessage.textContent = "Acesso administrativo confirmado para " + user.email + ".";
+    balanceTools.hidden = false;
     loginForm.hidden = true;
     logoutButton.hidden = false;
     loginToggle.textContent = "Administrador conectado";
   } else {
     adminMessage.textContent = "Esta conta está autenticada, mas não está cadastrada como administradora.";
+    balanceTools.hidden = true;
     loginForm.hidden = true;
     logoutButton.hidden = false;
   }
 }
+
+balanceForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  balanceMessage.textContent = "Salvando ajuste...";
+  const participantId = balanceParticipant.value;
+  const amount = Number(document.getElementById("balanceAmount").value);
+  const action = document.getElementById("balanceAction").value;
+  const reason = document.getElementById("balanceReason").value.trim();
+  if (!participantId || !Number.isInteger(amount) || amount < 1 || !reason) {
+    balanceMessage.textContent = "Confira participante, quantidade e motivo.";
+    return;
+  }
+  const change = action === "add" ? amount : -amount;
+  const { data, error } = await supabase.rpc("admin_adjust_balance", {
+    p_participant_id: participantId,
+    p_change: change,
+    p_reason: reason
+  });
+  if (error) {
+    balanceMessage.textContent = "Não foi possível ajustar: " + error.message;
+    console.error(error);
+    return;
+  }
+  const result = data && data[0];
+  balanceMessage.textContent = result
+    ? "Ajuste registrado! Saldo anterior: " + result.previous_balance + " · alteração: " + result.change_amount + " · novo saldo: " + result.new_balance
+    : "Ajuste enviado. Atualizando placar...";
+  balanceForm.reset();
+  await loadParticipants();
+});
 
 loginToggle.addEventListener("click", () => {
   adminBox.hidden = !adminBox.hidden;
