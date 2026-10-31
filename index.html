@@ -13,8 +13,8 @@
 @media(max-width:850px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{grid-template-columns:1fr}}@media(max-width:560px){.wrap{padding:18px 13px 30px}.top{align-items:flex-start}.season{font-size:10px;padding:7px 9px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.photo{height:145px}.person{padding:10px}.name{font-size:12px}.hero-card,.hero-stat{padding:17px}}
 </style></head>
 <body><main class="wrap">
-<header class="top"><div class="brand"><div class="logo">🫏</div><div><div class="eyebrow">A temporada das promessas</div><h1>Pedidos das Mulas</h1></div></div><div class="season">TEMPORADA <b>01</b> · EM ANDAMENTO</div></header>
-<section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
+<header class="top"><div class="brand"><div class="logo">🫏</div><div><div class="eyebrow">A temporada das promessas</div><h1>Pedidos das Mulas</h1></div></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button id="loginToggle" type="button" style="border:1px solid var(--line);background:#292018;color:var(--text);border-radius:999px;padding:10px 14px;font-weight:700;cursor:pointer">Área administrativa</button><div class="season">TEMPORADA <b>01</b> · EM ANDAMENTO</div></div></header>
+<section id="adminBox" hidden style="background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:18px"><h3 style="margin:0 0 10px">Acesso administrativo</h3><form id="loginForm" style="display:grid;gap:10px;max-width:420px"><label for="adminEmail">E-mail</label><input id="adminEmail" type="email" autocomplete="username" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><label for="adminPassword">Senha</label><input id="adminPassword" type="password" autocomplete="current-password" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"><button type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Entrar</button></form><div id="adminMessage" role="status" style="margin-top:10px;color:var(--muted)"></div><button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
 <article class="person" data-slug="apokao"><div class="photo"><img src="apokao.png" alt="Apokão"></div><div class="name-row"><div class="name">APOKÃO</div><div class="count zero">0</div></div><span class="status empty">Sem pedidos</span></article>
@@ -27,49 +27,38 @@
 </section>
 <div class="note"><b>Como funciona:</b> cada participante começa a temporada com 1 pedido. O saldo é atualizado conforme as regras oficiais após a validação do pedido e do resultado do round. O pedido coletivo do Chat exige apoio de mais de 30% dos usuários ativos nos últimos 5 minutos.</div>
 <footer><span>PEDIDOS DAS MULAS · TEMPORADA 01</span><span id="connection">Conectando ao banco de dados...</span></footer>
-</main><script>
+</main><script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const SUPABASE_URL = "https://nvdpctrvuxmhxuxudcpm.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_DDYDEEOeRGE47gHZyW8xmg_u3l-xdkb";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const connectionLabel = document.getElementById("connection");
+const adminBox = document.getElementById("adminBox");
+const loginToggle = document.getElementById("loginToggle");
+const loginForm = document.getElementById("loginForm");
+const adminMessage = document.getElementById("adminMessage");
+const logoutButton = document.getElementById("logoutButton");
 
 async function loadParticipants() {
   try {
-    const response = await fetch(
-      SUPABASE_URL + "/rest/v1/participants?select=slug,name,balance",
-      {
-        method: "GET",
-        headers: {
-          "apikey": SUPABASE_PUBLISHABLE_KEY,
-          "Authorization": "Bearer " + SUPABASE_PUBLISHABLE_KEY
-        },
-        cache: "no-store"
-      }
-    );
+    const { data, error } = await supabase
+      .from("participants")
+      .select("slug,name,balance");
+    if (error) throw error;
 
-    if (!response.ok) {
-      const details = await response.text();
-      throw new Error("HTTP " + response.status + " — " + details);
-    }
-
-    const participants = await response.json();
     let totalRequests = 0;
-
-    participants.forEach((participant) => {
+    data.forEach((participant) => {
       const card = document.querySelector('[data-slug="' + participant.slug + '"]');
       if (!card) return;
-
       const balance = Math.max(0, Number(participant.balance) || 0);
       totalRequests += balance;
-
       const count = card.querySelector(".count");
       const status = card.querySelector(".status");
       count.textContent = balance;
       count.classList.toggle("zero", balance === 0);
-
       if (balance > 0) {
-        status.textContent = balance === 1
-          ? "1 pedido disponível"
-          : balance + " pedidos disponíveis";
+        status.textContent = balance === 1 ? "1 pedido disponível" : balance + " pedidos disponíveis";
         status.classList.remove("empty");
         status.classList.add("available");
       } else {
@@ -78,7 +67,6 @@ async function loadParticipants() {
         status.classList.add("empty");
       }
     });
-
     document.getElementById("total").textContent = totalRequests;
     connectionLabel.textContent = "● Banco conectado · atualização automática";
     connectionLabel.style.color = "var(--green)";
@@ -88,6 +76,70 @@ async function loadParticipants() {
     connectionLabel.style.color = "var(--red)";
   }
 }
+
+async function refreshAdminState() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    adminMessage.textContent = "Entre com a conta cadastrada como administradora.";
+    loginForm.hidden = false;
+    logoutButton.hidden = true;
+    return;
+  }
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    adminMessage.textContent = "Não foi possível verificar a permissão. Tente novamente.";
+    console.error(error);
+    return;
+  }
+  if (data) {
+    adminMessage.textContent = "Acesso administrativo confirmado para " + user.email + ". O painel de alterações ainda será habilitado em uma próxima etapa.";
+    loginForm.hidden = true;
+    logoutButton.hidden = false;
+    loginToggle.textContent = "Administrador conectado";
+  } else {
+    adminMessage.textContent = "Esta conta está autenticada, mas não está cadastrada como administradora.";
+    loginForm.hidden = true;
+    logoutButton.hidden = false;
+  }
+}
+
+loginToggle.addEventListener("click", () => {
+  adminBox.hidden = !adminBox.hidden;
+  if (!adminBox.hidden) refreshAdminState();
+});
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  adminMessage.textContent = "Verificando acesso...";
+  const email = document.getElementById("adminEmail").value.trim();
+  const password = document.getElementById("adminPassword").value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    adminMessage.textContent = "Não foi possível entrar. Confira o e-mail e a senha.";
+    console.error(error);
+    return;
+  }
+  await refreshAdminState();
+});
+
+logoutButton.addEventListener("click", async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    adminMessage.textContent = "Não foi possível encerrar a sessão.";
+    return;
+  }
+  loginToggle.textContent = "Área administrativa";
+  await refreshAdminState();
+});
+
+supabase.auth.onAuthStateChange(() => {
+  if (!adminBox.hidden) refreshAdminState();
+});
 
 loadParticipants();
 setInterval(loadParticipants, 15000);
