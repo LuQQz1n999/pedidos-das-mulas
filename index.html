@@ -69,6 +69,13 @@
 <div id="historyList" style="display:grid;gap:10px"></div>
 <button id="refreshHistory" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar histórico</button>
 </div>
+<div id="balanceHistoryTools" hidden style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line)">
+<h4 style="margin:0 0 10px">Histórico de alterações de saldo</h4>
+<p style="font-size:11px;color:var(--muted);margin:0 0 12px">Registro de pedidos ganhos, perdas e ajustes administrativos, com saldo anterior e novo saldo.</p>
+<div id="balanceHistoryMessage" role="status" style="margin-bottom:10px;color:var(--muted)"></div>
+<div id="balanceHistoryList" style="display:grid;gap:10px"></div>
+<button id="refreshBalanceHistory" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar histórico de saldo</button>
+</div>
 <button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
@@ -110,6 +117,10 @@ const historyTools = document.getElementById("historyTools");
 const historyList = document.getElementById("historyList");
 const historyMessage = document.getElementById("historyMessage");
 const refreshHistory = document.getElementById("refreshHistory");
+const balanceHistoryTools = document.getElementById("balanceHistoryTools");
+const balanceHistoryList = document.getElementById("balanceHistoryList");
+const balanceHistoryMessage = document.getElementById("balanceHistoryMessage");
+const refreshBalanceHistory = document.getElementById("refreshBalanceHistory");
 
 async function loadParticipants() {
   try {
@@ -168,6 +179,7 @@ async function refreshAdminState() {
     requestTools.hidden = true;
     pendingTools.hidden = true;
     historyTools.hidden = true;
+    balanceHistoryTools.hidden = true;
     loginForm.hidden = false;
     logoutButton.hidden = true;
     return;
@@ -189,9 +201,11 @@ async function refreshAdminState() {
     requestTools.hidden = false;
     pendingTools.hidden = false;
     historyTools.hidden = false;
+    balanceHistoryTools.hidden = false;
     loginForm.hidden = true;
     await loadPendingRequests();
     await loadRequestHistory();
+    await loadBalanceHistory();
     logoutButton.hidden = false;
     loginToggle.textContent = "Administrador conectado";
   } else {
@@ -200,6 +214,7 @@ async function refreshAdminState() {
     requestTools.hidden = true;
     pendingTools.hidden = true;
     historyTools.hidden = true;
+    balanceHistoryTools.hidden = true;
     loginForm.hidden = true;
     logoutButton.hidden = false;
   }
@@ -364,6 +379,40 @@ async function loadRequestHistory() {
 }
 
 
+async function loadBalanceHistory() {
+  balanceHistoryMessage.textContent = "Carregando histórico de saldo...";
+  balanceHistoryList.replaceChildren();
+  const { data, error } = await supabase.rpc("admin_list_balance_history");
+  if (error) {
+    balanceHistoryMessage.textContent = "Não foi possível carregar o histórico: " + error.message;
+    console.error(error);
+    return;
+  }
+  if (!data || data.length === 0) {
+    balanceHistoryMessage.textContent = "Ainda não há alterações de saldo registradas.";
+    return;
+  }
+  balanceHistoryMessage.textContent = data.length + (data.length === 1 ? " alteração encontrada." : " alterações encontradas.");
+  data.forEach((entry) => {
+    const card = document.createElement("article");
+    card.style.cssText = "background:#24221f;border:1px solid var(--line);border-radius:12px;padding:13px;display:grid;gap:5px";
+    const heading = document.createElement("strong");
+    heading.textContent = entry.participant_name;
+    const detail = document.createElement("div");
+    detail.style.cssText = "font-size:12px;color:var(--muted);line-height:1.7";
+    const change = Number(entry.change_amount);
+    const signedChange = change > 0 ? "+" + change : String(change);
+    detail.textContent = "Saldo anterior: " + entry.previous_balance +
+      " · Alteração: " + signedChange +
+      " · Novo saldo: " + entry.new_balance +
+      " · Motivo: " + (entry.reason || "—") +
+      " · Data: " + new Date(entry.created_at).toLocaleString("pt-BR");
+    card.append(heading, detail);
+    balanceHistoryList.append(card);
+  });
+}
+
+
 balanceForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   balanceMessage.textContent = "Salvando ajuste...";
@@ -392,6 +441,7 @@ balanceForm.addEventListener("submit", async (event) => {
     : "Ajuste enviado. Atualizando placar...";
   balanceForm.reset();
   await loadParticipants();
+  await loadBalanceHistory();
 });
 
 requestForm.addEventListener("submit", async (event) => {
@@ -435,6 +485,7 @@ requestForm.addEventListener("submit", async (event) => {
 
 refreshPending.addEventListener("click", loadPendingRequests);
 refreshHistory.addEventListener("click", loadRequestHistory);
+refreshBalanceHistory.addEventListener("click", loadBalanceHistory);
 
 loginToggle.addEventListener("click", () => {
   adminBox.hidden = !adminBox.hidden;
