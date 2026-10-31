@@ -71,7 +71,7 @@
 </div>
 <div id="balanceHistoryTools" hidden style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line)">
 <h4 style="margin:0 0 10px">Histórico de alterações de saldo</h4>
-<p style="font-size:11px;color:var(--muted);margin:0 0 12px">Registro de pedidos ganhos, perdas e ajustes administrativos, com saldo anterior e novo saldo.</p>
+<p style="font-size:11px;color:var(--muted);margin:0 0 12px">Vitórias mantêm o saldo; derrotas zeram o saldo. Ajustes administrativos aparecem identificados separadamente.</p>
 <div id="balanceHistoryMessage" role="status" style="margin-bottom:10px;color:var(--muted)"></div>
 <div id="balanceHistoryList" style="display:grid;gap:10px"></div>
 <button id="refreshBalanceHistory" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar histórico de saldo</button>
@@ -402,7 +402,14 @@ async function loadBalanceHistory() {
     detail.style.cssText = "font-size:12px;color:var(--muted);line-height:1.7";
     const change = Number(entry.change_amount);
     const signedChange = change > 0 ? "+" + change : String(change);
-    detail.textContent = "Saldo anterior: " + entry.previous_balance +
+    let origin = "Ajuste administrativo";
+    if (entry.request_id !== null && entry.request_id !== undefined) {
+      if (entry.request_result === "win") origin = "Vitória · pedido #" + entry.request_id;
+      else if (entry.request_result === "loss") origin = "Derrota · pedido #" + entry.request_id;
+      else origin = "Validação · pedido #" + entry.request_id;
+    }
+    detail.textContent = "Origem: " + origin +
+      " · Saldo anterior: " + entry.previous_balance +
       " · Alteração: " + signedChange +
       " · Novo saldo: " + entry.new_balance +
       " · Motivo: " + (entry.reason || "—") +
