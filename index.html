@@ -62,6 +62,13 @@
 <div id="pendingList" style="display:grid;gap:10px"></div>
 <button id="refreshPending" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar pedidos</button>
 </div>
+<div id="historyTools" hidden style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line)">
+<h4 style="margin:0 0 10px">Histórico de pedidos</h4>
+<p style="font-size:11px;color:var(--muted);margin:0 0 12px">Registro dos pedidos, responsáveis, equipes escolhidas e resultados, incluindo pedidos cancelados.</p>
+<div id="historyMessage" role="status" style="margin-bottom:10px;color:var(--muted)"></div>
+<div id="historyList" style="display:grid;gap:10px"></div>
+<button id="refreshHistory" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar histórico</button>
+</div>
 <button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
@@ -99,6 +106,10 @@ const pendingTools = document.getElementById("pendingTools");
 const pendingList = document.getElementById("pendingList");
 const pendingMessage = document.getElementById("pendingMessage");
 const refreshPending = document.getElementById("refreshPending");
+const historyTools = document.getElementById("historyTools");
+const historyList = document.getElementById("historyList");
+const historyMessage = document.getElementById("historyMessage");
+const refreshHistory = document.getElementById("refreshHistory");
 
 async function loadParticipants() {
   try {
@@ -156,6 +167,7 @@ async function refreshAdminState() {
     balanceTools.hidden = true;
     requestTools.hidden = true;
     pendingTools.hidden = true;
+    historyTools.hidden = true;
     loginForm.hidden = false;
     logoutButton.hidden = true;
     return;
@@ -176,8 +188,10 @@ async function refreshAdminState() {
     balanceTools.hidden = false;
     requestTools.hidden = false;
     pendingTools.hidden = false;
+    historyTools.hidden = false;
     loginForm.hidden = true;
     await loadPendingRequests();
+    await loadRequestHistory();
     logoutButton.hidden = false;
     loginToggle.textContent = "Administrador conectado";
   } else {
@@ -185,6 +199,7 @@ async function refreshAdminState() {
     balanceTools.hidden = true;
     requestTools.hidden = true;
     pendingTools.hidden = true;
+    historyTools.hidden = true;
     loginForm.hidden = true;
     logoutButton.hidden = false;
   }
@@ -270,6 +285,7 @@ async function loadPendingRequests() {
         : "Pedido validado.";
       await loadParticipants();
       await loadPendingRequests();
+      await loadRequestHistory();
     });
     const cancelButton = document.createElement("button");
     cancelButton.type = "button";
@@ -291,11 +307,62 @@ async function loadPendingRequests() {
       }
       message.textContent = "Pedido cancelado. O saldo não foi alterado.";
       await loadPendingRequests();
+      await loadRequestHistory();
     });
     card.append(heading, details, damageLabel, damage, resultLabel, result, notesLabel, notes, button, cancelButton, message);
     pendingList.append(card);
   });
 }
+
+
+async function loadRequestHistory() {
+  historyMessage.textContent = "Carregando histórico...";
+  historyList.replaceChildren();
+  const { data, error } = await supabase.rpc("admin_list_request_history");
+  if (error) {
+    historyMessage.textContent = "Não foi possível carregar o histórico: " + error.message;
+    console.error(error);
+    return;
+  }
+  if (!data || data.length === 0) {
+    historyMessage.textContent = "Ainda não há pedidos registrados.";
+    return;
+  }
+  historyMessage.textContent = data.length + (data.length === 1 ? " registro encontrado." : " registros encontrados.");
+  const statusNames = {
+    pending: "Pendente",
+    invalid: "Inválido por dano anterior",
+    valid: "Validado",
+    won: "Vitória",
+    lost: "Derrota",
+    cancelled: "Cancelado"
+  };
+  data.forEach((request) => {
+    const card = document.createElement("article");
+    card.style.cssText = "background:#24221f;border:1px solid var(--line);border-radius:12px;padding:13px;display:grid;gap:5px";
+    const heading = document.createElement("strong");
+    heading.textContent = "Pedido #" + request.request_id + " · " + request.participant_name;
+    const detail = document.createElement("div");
+    detail.style.cssText = "font-size:12px;color:var(--muted);line-height:1.7";
+    const pieces = [
+      "Tipo: " + (request.request_type || "individual"),
+      "Equipe: " + (request.team || "—"),
+      "Solicitante: " + (request.requested_by || "—"),
+      "Canal: " + (request.channel || "—").toUpperCase(),
+      request.match_name ? "Partida: " + request.match_name : null,
+      request.round_number ? "Round: " + request.round_number : null,
+      "Data: " + new Date(request.requested_at).toLocaleString("pt-BR"),
+      "Status: " + (statusNames[request.status] || request.status || "—"),
+      request.result ? "Resultado: " + request.result : null,
+      request.damage_before_request === true ? "Dano anterior: sim" : request.damage_before_request === false ? "Dano anterior: não" : null,
+      request.notes ? "Observações: " + request.notes : null
+    ].filter(Boolean);
+    detail.textContent = pieces.join(" · ");
+    card.append(heading, detail);
+    historyList.append(card);
+  });
+}
+
 
 balanceForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -362,9 +429,12 @@ requestForm.addEventListener("submit", async (event) => {
     : "Pedido cadastrado como pendente.";
   requestForm.reset();
   await loadParticipants();
+  await loadPendingRequests();
+  await loadRequestHistory();
 });
 
 refreshPending.addEventListener("click", loadPendingRequests);
+refreshHistory.addEventListener("click", loadRequestHistory);
 
 loginToggle.addEventListener("click", () => {
   adminBox.hidden = !adminBox.hidden;
