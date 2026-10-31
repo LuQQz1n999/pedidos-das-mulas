@@ -55,6 +55,13 @@
 <div id="requestMessage" role="status" style="margin-top:10px;color:var(--muted)"></div>
 <p style="font-size:11px;color:var(--muted);margin:9px 0 0">O pedido será registrado como pendente. Este cadastro não altera o saldo nem valida dano ou resultado do round.</p>
 </div>
+<div id="pendingTools" hidden style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line)">
+<h4 style="margin:0 0 10px">Pedidos pendentes de validação</h4>
+<p style="font-size:11px;color:var(--muted);margin:0 0 12px">Confira os dados do pedido e as informações do round antes de validar. A validação atualiza o saldo automaticamente.</p>
+<div id="pendingMessage" role="status" style="margin-bottom:10px;color:var(--muted)"></div>
+<div id="pendingList" style="display:grid;gap:10px"></div>
+<button id="refreshPending" type="button" style="margin-top:12px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Atualizar pedidos</button>
+</div>
 <button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
@@ -88,6 +95,10 @@ const requestTools = document.getElementById("requestTools");
 const requestForm = document.getElementById("requestForm");
 const requestParticipant = document.getElementById("requestParticipant");
 const requestMessage = document.getElementById("requestMessage");
+const pendingTools = document.getElementById("pendingTools");
+const pendingList = document.getElementById("pendingList");
+const pendingMessage = document.getElementById("pendingMessage");
+const refreshPending = document.getElementById("refreshPending");
 
 async function loadParticipants() {
   try {
@@ -144,6 +155,7 @@ async function refreshAdminState() {
     adminMessage.textContent = "Entre com a conta cadastrada como administradora.";
     balanceTools.hidden = true;
     requestTools.hidden = true;
+    pendingTools.hidden = true;
     loginForm.hidden = false;
     logoutButton.hidden = true;
     return;
@@ -163,16 +175,105 @@ async function refreshAdminState() {
     adminMessage.textContent = "Acesso administrativo confirmado para " + user.email + ".";
     balanceTools.hidden = false;
     requestTools.hidden = false;
+    pendingTools.hidden = false;
     loginForm.hidden = true;
+    await loadPendingRequests();
     logoutButton.hidden = false;
     loginToggle.textContent = "Administrador conectado";
   } else {
     adminMessage.textContent = "Esta conta está autenticada, mas não está cadastrada como administradora.";
     balanceTools.hidden = true;
     requestTools.hidden = true;
+    pendingTools.hidden = true;
     loginForm.hidden = true;
     logoutButton.hidden = false;
   }
+}
+
+
+async function loadPendingRequests() {
+  pendingMessage.textContent = "Buscando pedidos pendentes...";
+  pendingList.replaceChildren();
+  const { data, error } = await supabase.rpc("admin_list_pending_requests");
+  if (error) {
+    pendingMessage.textContent = "Não foi possível carregar os pedidos: " + error.message;
+    console.error(error);
+    return;
+  }
+  if (!data || data.length === 0) {
+    pendingMessage.textContent = "Não há pedidos pendentes.";
+    return;
+  }
+  pendingMessage.textContent = data.length + (data.length === 1 ? " pedido pendente." : " pedidos pendentes.");
+  data.forEach((request) => {
+    const card = document.createElement("article");
+    card.style.cssText = "background:#24221f;border:1px solid var(--line);border-radius:12px;padding:13px;display:grid;gap:9px";
+    const heading = document.createElement("strong");
+    heading.textContent = "Pedido #" + request.request_id + " · " + request.participant_name;
+    const details = document.createElement("div");
+    details.style.cssText = "font-size:12px;color:var(--muted);line-height:1.7";
+    details.textContent = "Equipe: " + request.team + " · Solicitante: " + request.requested_by + " · Canal: " + request.channel.toUpperCase() +
+      (request.match_name ? " · Partida: " + request.match_name : "") +
+      (request.round_number ? " · Round: " + request.round_number : "") +
+      " · Registrado: " + new Date(request.requested_at).toLocaleString("pt-BR") +
+      (request.notes ? " · Observações: " + request.notes : "");
+    const damageLabel = document.createElement("label");
+    damageLabel.textContent = "Houve dano antes do pedido?";
+    const damage = document.createElement("select");
+    damage.style.cssText = "padding:10px;border-radius:8px;border:1px solid var(--line);background:#10100f;color:var(--text)";
+    damage.innerHTML = '<option value="">Selecione</option><option value="false">Não</option><option value="true">Sim</option>';
+    const resultLabel = document.createElement("label");
+    resultLabel.textContent = "Resultado da equipe escolhida";
+    const result = document.createElement("select");
+    result.style.cssText = damage.style.cssText;
+    result.innerHTML = '<option value="">Selecione</option><option value="win">Vitória</option><option value="loss">Derrota</option>';
+    const notesLabel = document.createElement("label");
+    notesLabel.textContent = "Observação da validação (opcional)";
+    const notes = document.createElement("input");
+    notes.type = "text";
+    notes.maxLength = 500;
+    notes.placeholder = "Ex.: round conferido na transmissão";
+    notes.style.cssText = damage.style.cssText;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Validar pedido";
+    button.style.cssText = "padding:10px 14px;border:0;border-radius:8px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer";
+    const message = document.createElement("div");
+    message.style.cssText = "font-size:12px;color:var(--muted)";
+    button.addEventListener("click", async () => {
+      if (damage.value === "") {
+        message.textContent = "Informe se houve dano antes do pedido.";
+        return;
+      }
+      if (damage.value === "false" && result.value === "") {
+        message.textContent = "Informe se a equipe venceu ou perdeu.";
+        return;
+      }
+      if (!confirm("Confirma a validação do pedido #" + request.request_id + "? Essa ação atualiza o saldo e não pode ser repetida.")) return;
+      button.disabled = true;
+      message.textContent = "Validando...";
+      const { data: validation, error: validationError } = await supabase.rpc("admin_validate_individual_request", {
+        p_request_id: request.request_id,
+        p_damage_before_request: damage.value === "true",
+        p_result: result.value || null,
+        p_notes: notes.value.trim() || null
+      });
+      if (validationError) {
+        message.textContent = "Erro: " + validationError.message;
+        button.disabled = false;
+        console.error(validationError);
+        return;
+      }
+      const outcome = validation && validation[0];
+      message.textContent = outcome
+        ? "Pedido processado. Saldo anterior: " + outcome.previous_balance + " · alteração: " + outcome.change_amount + " · novo saldo: " + outcome.new_balance + " · status: " + outcome.request_status
+        : "Pedido validado.";
+      await loadParticipants();
+      await loadPendingRequests();
+    });
+    card.append(heading, details, damageLabel, damage, resultLabel, result, notesLabel, notes, button, message);
+    pendingList.append(card);
+  });
 }
 
 balanceForm.addEventListener("submit", async (event) => {
@@ -241,6 +342,8 @@ requestForm.addEventListener("submit", async (event) => {
   requestForm.reset();
   await loadParticipants();
 });
+
+refreshPending.addEventListener("click", loadPendingRequests);
 
 loginToggle.addEventListener("click", () => {
   adminBox.hidden = !adminBox.hidden;
