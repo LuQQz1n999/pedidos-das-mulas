@@ -31,6 +31,30 @@
 <button id="balanceSubmit" type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Salvar ajuste</button>
 </form><div id="balanceMessage" role="status" style="margin-top:10px;color:var(--muted)"></div>
 </div>
+<div id="requestTools" hidden style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line);max-width:520px">
+<h4 style="margin:0 0 10px">Cadastrar pedido individual</h4>
+<form id="requestForm" style="display:grid;gap:9px">
+<label for="requestParticipant">Participante</label>
+<select id="requestParticipant" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)"></select>
+<label for="requestTeam">Equipe escolhida</label>
+<input id="requestTeam" type="text" maxlength="100" required placeholder="Ex.: FURIA" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<label for="requestBy">Quem solicitou</label>
+<input id="requestBy" type="text" maxlength="120" required placeholder="Nome do streamer ou administrador" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<label for="requestChannel">Canal</label>
+<select id="requestChannel" required style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<option value="kick">Kick</option><option value="youtube">YouTube</option>
+</select>
+<label for="requestMatch">Partida (opcional)</label>
+<input id="requestMatch" type="text" maxlength="160" placeholder="Ex.: FURIA x NAVI" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<label for="requestRound">Número do round (opcional)</label>
+<input id="requestRound" type="number" min="1" step="1" placeholder="Ex.: 7" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text)">
+<label for="requestNotes">Observações (opcional)</label>
+<textarea id="requestNotes" rows="3" maxlength="1000" placeholder="Informações adicionais para validação" style="padding:11px;border-radius:9px;border:1px solid var(--line);background:#10100f;color:var(--text);resize:vertical"></textarea>
+<button type="submit" style="padding:11px 15px;border:0;border-radius:9px;background:var(--orange);color:#20160d;font-weight:800;cursor:pointer">Cadastrar como pendente</button>
+</form>
+<div id="requestMessage" role="status" style="margin-top:10px;color:var(--muted)"></div>
+<p style="font-size:11px;color:var(--muted);margin:9px 0 0">O pedido será registrado como pendente. Este cadastro não altera o saldo nem valida dano ou resultado do round.</p>
+</div>
 <button id="logoutButton" type="button" hidden style="margin-top:10px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:#292018;color:var(--text);cursor:pointer">Sair</button></section><section class="hero"><div class="hero-card"><h2>Quem vai puxar o próximo pedido?</h2><p>O placar oficial das mulas. Acompanhe quem ainda tem pedido disponível e o histórico das loucuras da temporada.</p></div><div class="hero-stat"><div><small><i class="live-dot"></i>Pedidos disponíveis</small><strong id="total">1</strong><small>entre os participantes</small></div><div style="font-size:42px">🎟️</div></div></section>
 <div class="section-head"><h3>🐴 As mulas da temporada</h3><span>7 participantes · saldos atuais</span></div>
 <section class="grid" id="people">
@@ -60,6 +84,10 @@ const balanceTools = document.getElementById("balanceTools");
 const balanceForm = document.getElementById("balanceForm");
 const balanceParticipant = document.getElementById("balanceParticipant");
 const balanceMessage = document.getElementById("balanceMessage");
+const requestTools = document.getElementById("requestTools");
+const requestForm = document.getElementById("requestForm");
+const requestParticipant = document.getElementById("requestParticipant");
+const requestMessage = document.getElementById("requestMessage");
 
 async function loadParticipants() {
   try {
@@ -70,13 +98,17 @@ async function loadParticipants() {
 
     let totalRequests = 0;
     const selectedId = balanceParticipant.value;
-    balanceParticipant.replaceChildren(...data.map((participant) => {
+    const selectedRequestId = requestParticipant.value;
+    const makeOptions = () => data.map((participant) => {
       const option = document.createElement("option");
       option.value = participant.id;
       option.textContent = participant.name;
       return option;
-    }));
-    if (data.some((participant) => participant.id === selectedId)) balanceParticipant.value = selectedId;
+    });
+    balanceParticipant.replaceChildren(...makeOptions());
+    requestParticipant.replaceChildren(...makeOptions());
+    if (data.some((participant) => String(participant.id) === selectedId)) balanceParticipant.value = selectedId;
+    if (data.some((participant) => String(participant.id) === selectedRequestId)) requestParticipant.value = selectedRequestId;
     data.forEach((participant) => {
       const card = document.querySelector('[data-slug="' + participant.slug + '"]');
       if (!card) return;
@@ -111,6 +143,7 @@ async function refreshAdminState() {
   if (!user) {
     adminMessage.textContent = "Entre com a conta cadastrada como administradora.";
     balanceTools.hidden = true;
+    requestTools.hidden = true;
     loginForm.hidden = false;
     logoutButton.hidden = true;
     return;
@@ -129,12 +162,14 @@ async function refreshAdminState() {
   if (data) {
     adminMessage.textContent = "Acesso administrativo confirmado para " + user.email + ".";
     balanceTools.hidden = false;
+    requestTools.hidden = false;
     loginForm.hidden = true;
     logoutButton.hidden = false;
     loginToggle.textContent = "Administrador conectado";
   } else {
     adminMessage.textContent = "Esta conta está autenticada, mas não está cadastrada como administradora.";
     balanceTools.hidden = true;
+    requestTools.hidden = true;
     loginForm.hidden = true;
     logoutButton.hidden = false;
   }
@@ -167,6 +202,43 @@ balanceForm.addEventListener("submit", async (event) => {
     ? "Ajuste registrado! Saldo anterior: " + result.previous_balance + " · alteração: " + result.change_amount + " · novo saldo: " + result.new_balance
     : "Ajuste enviado. Atualizando placar...";
   balanceForm.reset();
+  await loadParticipants();
+});
+
+requestForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  requestMessage.textContent = "Cadastrando pedido...";
+  const participantId = requestParticipant.value;
+  const team = document.getElementById("requestTeam").value.trim();
+  const requestedBy = document.getElementById("requestBy").value.trim();
+  const channel = document.getElementById("requestChannel").value;
+  const matchName = document.getElementById("requestMatch").value.trim() || null;
+  const roundText = document.getElementById("requestRound").value.trim();
+  const roundNumber = roundText ? Number(roundText) : null;
+  const notes = document.getElementById("requestNotes").value.trim() || null;
+  if (!participantId || !team || !requestedBy || (roundNumber !== null && (!Number.isInteger(roundNumber) || roundNumber < 1))) {
+    requestMessage.textContent = "Confira os campos obrigatórios e o número do round.";
+    return;
+  }
+  const { data, error } = await supabase.rpc("admin_create_individual_request", {
+    p_participant_id: Number(participantId),
+    p_team: team,
+    p_requested_by: requestedBy,
+    p_channel: channel,
+    p_match_name: matchName,
+    p_round_number: roundNumber,
+    p_notes: notes
+  });
+  if (error) {
+    requestMessage.textContent = "Não foi possível cadastrar: " + error.message;
+    console.error(error);
+    return;
+  }
+  const result = data && data[0];
+  requestMessage.textContent = result
+    ? "Pedido #" + result.request_id + " cadastrado como pendente de validação."
+    : "Pedido cadastrado como pendente.";
+  requestForm.reset();
   await loadParticipants();
 });
 
